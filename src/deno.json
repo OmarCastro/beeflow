@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "jsxFactory": "h",
+    "lib": ["dom", "ESNext"],
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true
+  }
+}
