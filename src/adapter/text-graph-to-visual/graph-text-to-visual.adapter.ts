@@ -4,18 +4,20 @@ import type {Graph} from '../../model/graph-text-model.ts'
 const attrsTohtmlAttrs = (attrs: Record<string, string>) => Object.entries(attrs).map(([key, val]) => ` ${key}="${val.replaceAll('"', '&quot;')}"`).join("")
 
 
-const tag = (tag: string) => (attrs: Record<string, string>|string, ...html: string[]) => typeof attrs === "string" ? 
-    `<${tag}>${attrs}${html.join("")}</${tag}>` :
-    `<${tag}${attrsTohtmlAttrs(attrs)}>${html.join("")}</${tag}>`
+const tag = (tag: string) => (attrs: Record<string, string>|string|void, ...html: string[]) => attrs == null ? 
+    `<${tag}></${tag}>` : typeof attrs === "string" ? 
+        `<${tag}>${attrs}${html.join("")}</${tag}>` :
+        `<${tag}${attrsTohtmlAttrs(attrs)}>${html.join("")}</${tag}>`
 
 
-export function adapt(graph: Graph, prefix = "x-graph"){
+export function adapt(graph: Graph, {prefix = "x-graph", useMinimap = true} = {}){
 
     const graphTag = tag(prefix)
     const nodeTag = tag(`${prefix}--node`)
     const nodeInputTag = tag(`${prefix}--node-input`)
     const nodeOutputTag = tag(`${prefix}--node-output`)
     const edgeTag = tag(`${prefix}--edge`)
+    const minimapTag = tag(`${prefix}--minimap`)
     const label = tag('label')
     const span = tag('span')
     const input = tag('input')
@@ -55,7 +57,9 @@ export function adapt(graph: Graph, prefix = "x-graph"){
         return edgeTag({'start-node': edge.startNode, 'start-output': edge.startOutput, 'end-node': edge.endNode, 'end-input': edge.endInput, 'edge-color':color}, "")
     }).join("")
 
-    return graphTag({}, nodeHtml, edgeHtml)
+    const minimapHtml = useMinimap ? minimapTag() : ''
+
+    return graphTag({}, nodeHtml, edgeHtml, minimapHtml)
 }
 
 export default adapt
