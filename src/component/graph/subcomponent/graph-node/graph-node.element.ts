@@ -102,6 +102,12 @@ export class GraphNode extends HTMLElement {
         return { x, y }
     }
 
+    get nodeDimensions(){
+        const node = this.shadowRoot?.querySelector(".node") as HTMLElement | null
+        return node ? {width: node.offsetWidth, height: node.offsetHeight} : {width: 0, height: 0}
+
+    }
+
     get nodeId(){
         return this.getAttribute('node-id')
     }

@@ -45,7 +45,7 @@ function createEdges(edgeElements: GraphEdge[], shadowRoot: ShadowRoot, graph: G
                 `<path data-edge="${startNode}::${startOutput}->${endNode}::${endInput}" class="bg-edge" d="M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}"/>`,
                 `<path data-edge="${startNode}::${startOutput}->${endNode}::${endInput}" stroke="${edgeElement.color}" class="fg-edge" d="M${x1},${y1} C${(x1+x2)/2},${y1} ${(x1+x2)/2},${y2} ${x2},${y2}"/>`
             ]
-        }).reduce(([prevBg, prevFg], [currBg, currFg]) => [prevBg + currBg, prevFg + currFg]).join("")
+        }).reduce(([prevBg, prevFg], [currBg, currFg]) => [prevBg + currBg, prevFg + currFg], ["", ""]).join("")
         svg.insertAdjacentHTML("beforeend", svgElems)
     })
 }
