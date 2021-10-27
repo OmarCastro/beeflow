@@ -10,6 +10,7 @@ export default css`
     right: 20px;
     width: 20vmin;
     height: 20vmin;
+    z-index: 3;
 
 }
 
@@ -22,6 +23,11 @@ export default css`
 .minimap__nodes {
     fill: white;
     stroke: #456;
+    stroke-width: 1em;
+}
+
+.minimap__edges {
+    fill: none;
     stroke-width: 1em;
 }
 `
