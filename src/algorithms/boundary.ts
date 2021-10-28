@@ -1,7 +1,7 @@
 
 export interface BoundaryTarget<T> {
     left:number,
-    rigth:number,
+    right:number,
     top:number,
     bottom:number,
     data: T
@@ -18,7 +18,7 @@ function createEmptyBoundary<T>(): Boundary<T>{
 export class Boundary<T>{
   public constructor(
     public left:number,
-    public rigth:number,
+    public right:number,
     public top:number,
     public bottom:number,
     public targets:BoundaryTarget<T>[]
@@ -27,7 +27,7 @@ export class Boundary<T>{
 
 
   static createFromTarget<T>(target:BoundaryTarget<T>): Boundary<T>{
-    return new Boundary<T>(target.left, target.rigth, target.top, target.bottom,[target]);
+    return new Boundary<T>(target.left, target.right, target.top, target.bottom,[target]);
   }
 
   static createFromTargets<T>(targets:BoundaryTarget<T>[]): Boundary<T>{
@@ -37,7 +37,7 @@ export class Boundary<T>{
 
   addTarget(target: BoundaryTarget<T>): Boundary<T>{
     const left   = Math.min(target.left   ,this.left)
-    const rigth  = Math.max(target.rigth  ,this.rigth)
+    const rigth  = Math.max(target.right  ,this.right)
     const top    = Math.min(target.top    ,this.top)
     const bottom = Math.max(target.bottom ,this.bottom)
     const targets = [...this.targets, target]
@@ -50,7 +50,7 @@ export class Boundary<T>{
 
   extend(boundary2: Boundary<T>): Boundary<T>{
       const left   = Math.min(boundary2.left   ,this.left)
-      const rigth  = Math.max(boundary2.rigth  ,this.rigth)
+      const rigth  = Math.max(boundary2.right  ,this.right)
       const top    = Math.min(boundary2.top    ,this.top)
       const bottom = Math.max(boundary2.bottom ,this.bottom)
       const targets = [...this.targets, ...boundary2.targets]
@@ -59,12 +59,12 @@ export class Boundary<T>{
 
   translateXY(x = 0, y = 0){
     this.left   += x
-    this.rigth  += x
+    this.right  += x
     this.top    += y
     this.bottom += y
     this.targets.forEach(target => {
         target.left   += x
-        target.rigth  += x
+        target.right  += x
         target.top    += y
         target.bottom += y
   });

@@ -30,4 +30,8 @@ export default css`
     fill: none;
     stroke-width: 1em;
 }
+
+.minimap__viewport {
+    fill: none;
+}
 `

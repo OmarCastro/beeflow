@@ -163,9 +163,12 @@ export class Graph extends HTMLElement {
             graph.addEventListener("nodeoutputconnectorpointerdown", handleConnectorPointerdown())
 
             this.reflecViewPort = throttleAnimationFrame(() => {
-                graphStyle.setProperty("--x", this.x.toString() + "px")
-                graphStyle.setProperty("--y", this.y.toString() + "px")
-                graphStyle.setProperty("--scale", this.scale.toString())
+                const {x,y,scale} = this
+                graphStyle.setProperty("--x", `${x}px`)
+                graphStyle.setProperty("--y", `${y}px`)
+                graphStyle.setProperty("--scale", `${scale}`)
+                const event = new CustomEvent("viewportChange", {bubbles: true})
+                this.dispatchEvent(event)
             })
         })
 
@@ -175,6 +178,15 @@ export class Graph extends HTMLElement {
                 updateEdgesOfNode(target, shadowRoot, this)
             }
         })
+    }
+
+    get viewPortRect(): DOMRect {
+        const {x,y,scale} = this
+        const rect = this.shadowRoot?.querySelector('.graph')?.getBoundingClientRect() || new DOMRect()
+        const matrix = new DOMMatrix(`translate3d(${x}px, ${y}px, 0)  scale(${scale})`).inverse()
+        const {x: x1, y: y1} = DOMPoint.fromPoint({x: rect.left, y: rect.top}).matrixTransform(matrix);
+        const {x: x2, y: y2} = DOMPoint.fromPoint({x: rect.right, y: rect.bottom}).matrixTransform(matrix);
+        return DOMRect.fromRect({x: x1, y: y1, width: x2 - x1, height: y2 - y1 })
     }
 
     get scale(): number {

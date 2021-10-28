@@ -15,19 +15,27 @@ let loadTemplate = () => Promise.all([
 
 const { GraphNode } = await import('../graph-node/graph-node.element.ts')
 const { GraphEdge } = await import('../graph-edge/graph-edge.element.ts')
+type MaybeGraphElement = HTMLElement & {readonly viewPortRect?: DOMRect}
+
 
 const getSiblings = (elm: Element) => elm && elm.parentNode && Array.from(elm.parentNode.children).filter(node => node != elm) || []
 
 function toBoundaryTarget (node: GraphNode) : BoundaryTarget<GraphNode>{
     const {x, y} = node.position
     const { width, height } = node.nodeDimensions
-    return { left: x, top: y, rigth: x + width, bottom: y + height, data: node }
+    return { left: x, top: y, right: x + width, bottom: y + height, data: node }
+}
+
+function rectToBoundaryTarget (domRect: DOMRect) : BoundaryTarget<DOMRect>{
+    const {left, top, right, bottom} = domRect
+    return {left, top, right, bottom, data: domRect}
 }
 
 export class GraphMinimap extends HTMLElement {
-    private removeParentListener: () => void = () => {};
+    private removeParentListeners: () => void = () => {};
     private renderMinimap: () => void = () => {};
     private updateNodePosition: (node: GraphNode) => void = () => {};
+    private updateViewPort: () => void = () => {};
 
 
     constructor(){
@@ -39,11 +47,21 @@ export class GraphMinimap extends HTMLElement {
             const minimapSvg = shadowRoot.querySelector(".minimap__svg") as SVGElement
             const minimapNodes = shadowRoot.querySelector(".minimap__nodes") as SVGGElement
             const minimapEdges = shadowRoot.querySelector(".minimap__edges") as SVGGElement
+            const minimapViewPort = shadowRoot.querySelector(".minimap__viewPort") as SVGGElement
             
+            const getViewPort = () => {
+                const parentElement = this.parentElement as MaybeGraphElement
+                if(!parentElement){
+                    return new DOMRect()
+                }
+                const { viewPortRect } = parentElement
+                return viewPortRect instanceof DOMRect ? viewPortRect : new DOMRect()
 
+            }
 
             const getGraphInfo = () => {
                 const siblingElements = getSiblings(this);
+                const viewPort = getViewPort();
                 const siblingNodes = siblingElements.filter(elem => elem instanceof GraphNode) as GraphNode[]
                 const siblingNodesMap = siblingNodes.reduce((acc, node) => {
                     const {nodeId} = node
@@ -61,16 +79,27 @@ export class GraphMinimap extends HTMLElement {
                     } 
                     return acc
                 }, {} as Record<string, BoundaryTarget<GraphNode>>)
-                const boundary = Boundary.createFromTargets(boundaryTargets)
-                return {siblingNodes, siblingNodesMap, siblingEdges, boundaryTargets, boundaryTargetMap, boundary}
+                const boundary = Boundary.createFromTargets<GraphNode|DOMRect>([...boundaryTargets, rectToBoundaryTarget(viewPort)])
+                return {siblingNodes, siblingNodesMap, siblingEdges, boundaryTargets, boundaryTargetMap, boundary, viewPort}
 
             }
 
             const updateBoundaries = (graphInfo: ReturnType<typeof getGraphInfo>) => {
-                const {left, top, rigth, bottom} = graphInfo.boundary
+                const {left, top, right, bottom} = graphInfo.boundary
                 const margin = 10
-                minimapSvg.setAttribute("viewBox", `${left - margin} ${top - margin} ${rigth - left + margin * 2} ${bottom - top + margin * 2}`)
+                minimapSvg.setAttribute("viewBox", `${left - margin} ${top - margin} ${right - left + margin * 2} ${bottom - top + margin * 2}`)
+            }
 
+            this.updateViewPort = () => {
+                const graphInfo = getGraphInfo();
+                updateBoundaries(graphInfo)
+                const {x, y, width, height} = graphInfo.viewPort
+                minimapViewPort.querySelectorAll('rect').forEach(rect => {
+                    rect.setAttribute("x", String(x))
+                    rect.setAttribute("y", String(y))
+                    rect.setAttribute("width", String(width))
+                    rect.setAttribute("height", String(height))
+                })
             }
 
             this.renderMinimap = debounceAnimationFrame(() => {
@@ -80,9 +109,9 @@ export class GraphMinimap extends HTMLElement {
 
                 const graphInfo = getGraphInfo();
                 updateBoundaries(graphInfo)
-                const {siblingNodesMap, siblingEdges, boundaryTargets} = graphInfo;
-                minimapNodes.innerHTML = boundaryTargets.map(({left, rigth, top, bottom, data}) => {
-                    const width = rigth - left
+                const {siblingNodesMap, siblingEdges, boundaryTargets, viewPort} = graphInfo;
+                minimapNodes.innerHTML = boundaryTargets.map(({left, right, top, bottom, data}) => {
+                    const width = right - left
                     const height = bottom - top
                     return `<rect x="${left}" y="${top}" width="${width}" height="${height}" data-node-id="${data.nodeId}" rx="15" />`
                 }).join("")
@@ -103,6 +132,8 @@ export class GraphMinimap extends HTMLElement {
 
                 }).join("")
 
+                minimapViewPort.innerHTML = `<rect stroke="red" vector-effect="non-scaling-stroke" stroke-width="1" x="${viewPort.x}" y="${viewPort.y}" width="${viewPort.width}" height="${viewPort.height}" />`
+
             })
 
             this.updateNodePosition = (node: GraphNode) => {
@@ -113,8 +144,8 @@ export class GraphMinimap extends HTMLElement {
                 const graphInfo = getGraphInfo();
                 updateBoundaries(graphInfo)
 
-                const {left, rigth, top, bottom} = graphInfo.boundaryTargetMap[nodeId]
-                const width = rigth - left
+                const {left, right, top, bottom} = graphInfo.boundaryTargetMap[nodeId]
+                const width = right - left
                 const height = bottom - top
                 rect.setAttribute("x", left.toString())
                 rect.setAttribute("y", top.toString())
@@ -148,21 +179,27 @@ export class GraphMinimap extends HTMLElement {
         if(parentElement == null){
             return
         }
-        const eventListener = (event: Event) => {
+        const nodePositionChangedCallback = (event: Event) => {
             const {target} = event
             if(target instanceof GraphNode){
                 this.updateNodePosition(target)
             }
         }
 
-        parentElement.addEventListener("nodePositionChanged", eventListener)
-        this.removeParentListener = () => parentElement.removeEventListener("nodePositionChanged", eventListener)
-        this.renderMinimap;
+        const viewportUpdatedCallback = () => this.updateViewPort()
+
+        parentElement.addEventListener("nodePositionChanged", nodePositionChangedCallback)
+        parentElement.addEventListener("viewportChange", viewportUpdatedCallback)
+        this.removeParentListeners = () => {
+            parentElement.removeEventListener("nodePositionChanged", nodePositionChangedCallback)
+            parentElement.removeEventListener("viewportChange", viewportUpdatedCallback)
+        }
+        this.renderMinimap();
     }
 
     disconnectedCallback(){
-        this.removeParentListener()
-        this.removeParentListener = () => {}
+        this.removeParentListeners()
+        this.removeParentListeners = () => {}
     }
 
 }
