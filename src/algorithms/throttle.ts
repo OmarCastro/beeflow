@@ -14,37 +14,38 @@ export function throttleTimeFrame<T extends VoidFunction>(fn: T, timeFrame: numb
 
 
 export function throttleAnimationFrame<T extends VoidFunction>(fn: T) {
-    let waiting = false
-    return (...args: Parameters<T>) => {
-        if(!waiting){
-            fn(...args)
-            waiting = true;
-            requestAnimationFrame(() =>{ waiting = false })
-        }
+    const wait = () => {}
+    const stopWaiting = () => { nextAction = execAndwait }
+    const execAndwait = (...args: Parameters<T>) => {
+        fn(...args)
+        nextAction = wait
+        requestAnimationFrame(stopWaiting)
     }
+    let nextAction = execAndwait
+    return (...args: Parameters<T>) => nextAction(...args)
 }
 
 export function throttleTrailingAnimationFrame<T extends VoidFunction>(fn: T) {
-    let waiting = false
-    const defaultSavedArgs = [] as Parameters<T>
-    let savedArgs: Parameters<T> = defaultSavedArgs
-    return (...args: Parameters<T>) => {
-        if(!waiting){
-            fn(...args)
-            waiting = true;
-            requestAnimationFrame(function exec(){
-                if(savedArgs === defaultSavedArgs){
-                    waiting = false
-                } else {
-                    fn(...savedArgs)
-                    savedArgs = defaultSavedArgs
-                    requestAnimationFrame(exec)
-                }
-            })
-        } else {
-            savedArgs = args
-        }
+    const stopWaiting = () => { nextAction = execAndwait }
+    const executeAgain = () => { 
+        fn(...savedArgs)
+        nextFrameAcion = stopWaiting
+        requestAnimationFrame(doNextFrameAcion)
     }
+    const doNextFrameAcion = () => nextFrameAcion()
+    const saveArgs = (...args: Parameters<T>) => {
+        savedArgs = args
+        nextFrameAcion = executeAgain
+    }
+    const execAndwait = (...args: Parameters<T>) => {
+        fn(...args)
+        nextAction = saveArgs;
+        requestAnimationFrame(doNextFrameAcion)
+    }
+    let savedArgs = [] as Parameters<T>
+    let nextAction = execAndwait
+    let nextFrameAcion = stopWaiting
+    return (...args: Parameters<T>) => nextAction(...args)
 }
 
 export default throttleTimeFrame
