@@ -32,6 +32,8 @@ export default css`
 }
 
 .graph__edges {
+    width: 1px;
+    height: 1px;
     overflow: visible;
 }
 
