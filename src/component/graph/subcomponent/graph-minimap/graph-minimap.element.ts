@@ -31,11 +31,22 @@ function rectToBoundaryTarget (domRect: DOMRect) : BoundaryTarget<DOMRect>{
     return {left, top, right, bottom, data: domRect}
 }
 
+
+const resizeObserver = new ResizeObserver(entries => {
+    for (const entry of entries) {
+        Array.from(entry.target.children).forEach(element => {
+            if(element instanceof GraphMinimap){
+                (element as GraphMinimap).updateViewPort()
+            }
+        });
+    }
+});
+
 export class GraphMinimap extends HTMLElement {
     private removeParentListeners: () => void = () => {};
     private renderMinimap: () => void = () => {};
     private updateNodePosition: (node: GraphNode) => void = () => {};
-    private updateViewPort: () => void = () => {};
+    public updateViewPort: () => void = () => {};
 
 
     constructor(){
@@ -90,7 +101,7 @@ export class GraphMinimap extends HTMLElement {
                 minimapSvg.setAttribute("viewBox", `${left - margin} ${top - margin} ${right - left + margin * 2} ${bottom - top + margin * 2}`)
             }
 
-            this.updateViewPort = () => {
+            this.updateViewPort = debounceAnimationFrame(() => {
                 const graphInfo = getGraphInfo();
                 updateBoundaries(graphInfo)
                 const {x, y, width, height} = graphInfo.viewPort
@@ -100,7 +111,7 @@ export class GraphMinimap extends HTMLElement {
                     rect.setAttribute("width", String(width))
                     rect.setAttribute("height", String(height))
                 })
-            }
+            })
 
             this.renderMinimap = debounceAnimationFrame(() => {
                 if(!this.isConnected){
@@ -190,9 +201,11 @@ export class GraphMinimap extends HTMLElement {
 
         parentElement.addEventListener("nodePositionChanged", nodePositionChangedCallback)
         parentElement.addEventListener("viewportChange", viewportUpdatedCallback)
+        resizeObserver.observe(parentElement)
         this.removeParentListeners = () => {
             parentElement.removeEventListener("nodePositionChanged", nodePositionChangedCallback)
             parentElement.removeEventListener("viewportChange", viewportUpdatedCallback)
+            resizeObserver.unobserve(parentElement)
         }
         this.renderMinimap();
     }

@@ -1,6 +1,12 @@
 const { css } = await import('../../util/css/css.ts')
 
 export default css`
+:host {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+}
+
 .graph {
     width: 100%;
     height: 100%;
