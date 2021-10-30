@@ -25,14 +25,12 @@ export class GraphNode extends HTMLElement {
 
             const node = shadowRoot.querySelector(".node") as HTMLElement        
             node.addEventListener("pointerdown", (pointerEvent: PointerEvent) => {
-
                 const { screenX, screenY, target } = pointerEvent
-
-
                 if(target instanceof HTMLElement && target.matches("select")){
                     return
                 }
 
+                pointerEvent.preventDefault()
                 const style = window.getComputedStyle(this);
                 const scale = parseFloat(style.getPropertyValue('--scale')); 
           
