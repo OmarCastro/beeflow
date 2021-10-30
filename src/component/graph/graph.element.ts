@@ -1,6 +1,6 @@
 declare type GraphEdge = import('./subcomponent/graph-edge/graph-edge.element.ts').GraphEdge;
 declare type GraphNode = import('./subcomponent/graph-node/graph-node.element.ts').GraphNode;
-import { throttleAnimationFrame } from '../../algorithms/throttle.ts'
+import { throttleAnimationFrame, throttleTrailingAnimationFrame } from '../../algorithms/throttle.ts'
 
 
 let loadTemplate = () => Promise.all([
@@ -102,7 +102,17 @@ export class Graph extends HTMLElement {
             graph.addEventListener("wheel", (event) => {
                 const {target, deltaY} = event as WheelEvent
                 if(target === graph){
-                    this.scale = Math.min(Math.max(this.scale + (deltaY > 0 ? 0.1 : -0.1), 0.1), 5);
+                    const { scale, x, y } = this
+                    const clientRect = graph.getBoundingClientRect()
+                    const relativePosition = {
+                        x: (event.clientX - x) / scale - clientRect.left,
+                        y: (event.clientY - y) / scale - clientRect.top,
+                        
+                    }
+                    const newScale = Math.min(Math.max(scale + (deltaY > 0 ? 0.1 : -0.1), 0.1), 5);
+                    this.x = x + (relativePosition.x * scale - relativePosition.x * newScale)
+                    this.y = y + (relativePosition.y * scale - relativePosition.y * newScale)
+                    this.scale = newScale
                 }
             })
 
@@ -162,7 +172,7 @@ export class Graph extends HTMLElement {
             graph.addEventListener("nodeinputconnectorpointerdown", handleConnectorPointerdown())
             graph.addEventListener("nodeoutputconnectorpointerdown", handleConnectorPointerdown())
 
-            this.reflecViewPort = throttleAnimationFrame(() => {
+            this.reflecViewPort = throttleTrailingAnimationFrame(() => {
                 const {x,y,scale} = this
                 graphStyle.setProperty("--x", `${x}px`)
                 graphStyle.setProperty("--y", `${y}px`)
