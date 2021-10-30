@@ -55,20 +55,5 @@ export class Boundary<T>{
       const bottom = Math.max(boundary2.bottom ,this.bottom)
       const targets = [...this.targets, ...boundary2.targets]
       return new Boundary (left,rigth,top,bottom,targets)
-  }
-
-  translateXY(x = 0, y = 0){
-    this.left   += x
-    this.right  += x
-    this.top    += y
-    this.bottom += y
-    this.targets.forEach(target => {
-        target.left   += x
-        target.right  += x
-        target.top    += y
-        target.bottom += y
-  });
-  
-  }
- 
+  } 
 }
