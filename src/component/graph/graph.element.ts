@@ -1,6 +1,8 @@
 declare type GraphEdge = import('./subcomponent/graph-edge/graph-edge.element.ts').GraphEdge;
 declare type GraphNode = import('./subcomponent/graph-node/graph-node.element.ts').GraphNode;
 import { throttleAnimationFrame, throttleTrailingAnimationFrame } from '../../algorithms/throttle.ts'
+import { debounceAnimationFrame } from '../../algorithms/debounce.ts'
+import { calculateLayout } from '../../algorithms/graph.ts'
 
 
 let loadTemplate = () => Promise.all([
@@ -80,6 +82,7 @@ function updateEdgesOfNode(node: GraphNode, shadowRoot: ShadowRoot, graph: Graph
 export class Graph extends HTMLElement {
 
     private reflecViewPort: () => void = () => {};
+    private positionNodes: () => void = () => {};
 
     constructor(){
         super()
@@ -180,6 +183,57 @@ export class Graph extends HTMLElement {
                 const event = new CustomEvent("viewportChange", {bubbles: true})
                 this.dispatchEvent(event)
             })
+
+            const isNodeLoaded = (node: GraphNode) => {
+                const {width, height} = node.nodeDimensions
+                console.log({width, height})
+                return width > 0 && height > 0
+            }
+
+            const isNodePositionDefined = (node: GraphNode) => node.hasAttribute("x") && node.hasAttribute("y")
+            const isNodePositionUndefined = (node: GraphNode) => !isNodePositionDefined(node)
+        
+            const toPreCalculatedLayoutNode = (node: GraphNode) => {
+                const {width, height} = node.nodeDimensions
+                return { width, height, name: node.nodeId ?? "" }
+            }
+
+            const toPreCalculatedLayoutEdge = (edge: GraphEdge) => {
+                const {startNode, endNode} = edge
+                return { start: startNode ?? "",  end: endNode ?? ""}
+            }
+
+
+            const positionNodes = () => {
+                if(!this.isConnected){
+                    return
+                }
+                const childNodes = Array.from(this.children)
+                const nodes = childNodes.filter(child => child instanceof GraphNode) as GraphNode[]
+                const edges = childNodes.filter(child => child instanceof GraphEdge) as GraphEdge[]
+                const areAllNodesLoaded = nodes.every(isNodeLoaded)
+                const areSomeNodePositionsUndefined = nodes.some(isNodePositionUndefined)
+                if(areAllNodesLoaded && areSomeNodePositionsUndefined){
+                    const calculateGraph = calculateLayout({
+                        nodes: nodes.map(toPreCalculatedLayoutNode),
+                        edges: edges.map(toPreCalculatedLayoutEdge),
+                    })
+                    console.log(calculateGraph)
+                    calculateGraph.nodes.forEach(calculatedNode => {
+                        const {name, x, y} = calculatedNode
+                        nodes
+                            .filter(node => node.nodeId === name)
+                            .forEach(node => {
+                                node.setAttribute("x", String(x))
+                                node.setAttribute("y", String(y))
+                            })
+                    })
+                } else if(nodes.length > 0 && areSomeNodePositionsUndefined) {
+                    requestAnimationFrame(positionNodes)
+                }
+            }
+            this.positionNodes = debounceAnimationFrame(positionNodes)
+            this.positionNodes()
         })
 
         this.addEventListener("nodePositionChanged", (event) => {
@@ -221,6 +275,10 @@ export class Graph extends HTMLElement {
 
     set y(num: number) {
         this.setAttribute("y", String(num))
+    }
+
+    connectedCallback(){
+        this.positionNodes()
     }
 
     static get observedAttributes() { return ['x','y','scale']; }
