@@ -127,16 +127,24 @@ function sortGraphNodes(graph: CalculatingGraph): NonNullable<CalculatingGraph['
   const nodeOutputMap = getNodeOutputMap(graph)
   const sorted = [] as Node[];
   const marks = {} as Record<string, string>;
-  try {
-    nodes.forEach(node => {
-      if (!marks[node.name]){
-          visit(node)
-      }
-    })
-  } catch {
-    return graph.sortedNodes = unsortableNodes
-  }
+
+    // DFS in an iterative way
+    type Action = [(node: Node) => void, Node]
+    const actions = nodes.map(node => [visitUnmarked, node] as Action)  
+    while(isNonEmptyArray(actions)){
+      const [method, node] = actions.pop()
+      try { method(node) }
+      catch { return graph.sortedNodes = unsortableNodes }  
+    }
+
+  
   return graph.sortedNodes = sorted;
+  
+  function visitUnmarked(node: Node){
+    if(!marks[node.name]){
+      visit(node)
+    }
+  }
 
   function visit(node: Node) {
     const {name} = node
@@ -144,11 +152,12 @@ function sortGraphNodes(graph: CalculatingGraph): NonNullable<CalculatingGraph['
       throw new Error("There is a cycle in the graph. It is not possible to derive a topological sort.");
     else if (marks[name])
       return;
-
     marks[name] = 'temp';
-    nodeOutputMap[name].forEach((end) => visit(nodeMap[end]));
-    marks[name] = 'perm';
+    actions.push([afterChildVisit, node], ...nodeOutputMap[name].map((end) => [visit, nodeMap[end]] as Action))
+  }
 
+  function afterChildVisit(node: Node){
+    marks[node.name] = 'perm';
     sorted.push(node);
   }
 }
@@ -168,20 +177,31 @@ function calculateRankswithIslandsNodes(graph: CalculatingGraph){
   const ranks = {} as Record<string, number>;
   const marks = {} as Record<string, string>;
   const sets = new Set() as Set<Set<string>>;
-  const orderedNodes = [...nodes].sort((a, b) => nodeOutputMap[a.name].length - nodeOutputMap[b.name].length)
 
-  orderedNodes.forEach(node => {
-    if (!marks[node.name]){
-        visit(node, {set: new Set(), rank: 0 })
-    }
-  })
+  type VisitData = {set: Set<string>, rank: number}
+
+  // DFS in an iterative way
+  type Action = [(node: Node, data: VisitData) => void, Node, VisitData]
+  const actions = nodes.map(node => [visitUnmarked, node, {set: new Set(), rank: 0 }] as Action)
+                       // in descending order, to visit nodes with least number of outgoing edges first
+                       .sort((a, b) => nodeOutputMap[b[1].name].length - nodeOutputMap[a[1].name].length)
+  while(isNonEmptyArray(actions)){
+    const [method, node, data] = actions.pop()
+    method(node, data)
+  }
   
   return {
     ranks, 
     islands: Array.from(sets).map(set => Array.from(set).map(name => nodeMap[name]))
   };
 
-  function visit(node: Node, data: {set: Set<string>, rank: number}) {
+  function visitUnmarked(node: Node, data: VisitData){
+    if(!marks[node.name]){
+      visit(node, data)
+    }
+  }
+
+  function visit(node: Node, data: VisitData) {
     const {name} = node
 
     if(marks[name] === 'temp'){
@@ -213,8 +233,11 @@ function calculateRankswithIslandsNodes(graph: CalculatingGraph){
     marks[name] = 'temp'
     data.set.add(name)
     data.rank += 1
-    nodeOutputMap[name].forEach((end) => visit(nodeMap[end], data));
-    marks[name] = 'perm'
+    actions.push([afterChildVisit, node, data], ...nodeOutputMap[name].map((end) => [visit, nodeMap[end], data] as Action))
+  }
+
+  function afterChildVisit(node: Node, data: VisitData){
+    marks[node.name] = 'perm';
     sets.add(data.set);
   }
 }
@@ -278,6 +301,7 @@ export const getRankswithIslandsNodes = (graph: CalculatingGraph) => graph.ranks
 export const getNodeRanks = (graph: CalculatingGraph) => graph.nodeRanks ??= calculateNodeRanks(graph)
 
 
+
 export function calculateLayout(graph: Graph): CalcutatedGraph{
   const nodeRanks = getNodeRanks(graph)
   const nodeIslandMap = getNodeIslandMap(graph)
@@ -316,4 +340,16 @@ export function calculateLayout(graph: Graph): CalcutatedGraph{
     ...graph,
     nodes: calculatedNodes
   }
+}
+
+
+interface NonEmptyArray<T> extends Array<T>{
+  0: T
+  shift(): T
+  pop(): T
+}
+
+
+function isNonEmptyArray<T>(arr: T[]): arr is NonEmptyArray<T> {
+  return arr.length > 0;
 }
