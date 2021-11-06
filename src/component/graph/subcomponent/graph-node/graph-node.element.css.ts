@@ -1,6 +1,7 @@
 const { css } = await import('../../../../util/css/css.ts')
 
 export default css`
+
 .node {
     font-size: 20px;
     display: inline-block;
@@ -9,6 +10,10 @@ export default css`
     border-radius: 0.5em;
     position: absolute  
 
+}
+
+.node--loading{
+    visibility: hidden;
 }
 
 .node__title{

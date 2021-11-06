@@ -1,5 +1,6 @@
 declare type GraphNodeInput = import('../graph-node-input/graph-node-input.element.ts').GraphNodeInput;
 declare type GraphNodeOutput = import('../graph-node-output/graph-node-output.element.ts').GraphNodeOutput;
+
 import { throttleAnimationFrame, throttleTrailingAnimationFrame } from '../../../../algorithms/throttle.ts'
 
 let loadTemplate = () => Promise.all([
@@ -14,14 +15,48 @@ let loadTemplate = () => Promise.all([
 const { GraphNodeInput } = await import('../graph-node-input/graph-node-input.element.ts')
 const { GraphNodeOutput } = await import('../graph-node-output/graph-node-output.element.ts')
 
+
+
+function getTemplate(node: GraphNode): Promise<HTMLTemplateElement> {
+    return new Promise(resolve => {
+
+        function getTemplate(){
+            if(!node.isConnected){
+                requestAnimationFrame(getTemplate)
+                return
+            }
+            const nodeType = node.getAttribute("type")
+            if(nodeType == null || nodeType === ""){
+                return
+            }
+            const template = node.parentElement?.querySelector(`:scope > template[data-of-node-type="${nodeType}"]`) as HTMLTemplateElement | null
+            if(template == null){
+                requestAnimationFrame(getTemplate)
+                return
+            }
+            resolve(template)
+        }
+
+        getTemplate();
+
+        
+    })
+}
+
+function reflectData(node: GraphNode, shadowRoot: ShadowRoot){
+    shadowRoot.querySelectorAll('.node__title')?.forEach((title) => title.textContent = String(node.getAttribute('type')))
+}
+
 export class GraphNode extends HTMLElement {
     private reflectPosition: () => void = () => {};
+    private getNodeDimension: () => {width: number, height: number} = () => ({width: 0, height: 0});
 
     constructor(){
         super()
         const shadowRoot = this.attachShadow({mode: "open"})
-        loadTemplate().then(template => {
-            shadowRoot.append(document.importNode(template.content, true))    
+        Promise.all([loadTemplate(), getTemplate(this)]).then(([template, nodeTemplate]) => {
+            shadowRoot.append(document.importNode(template.content, true))
+            this.append(document.importNode(nodeTemplate.content, true));
 
             const node = shadowRoot.querySelector(".node") as HTMLElement        
             node.addEventListener("pointerdown", (pointerEvent: PointerEvent) => {
@@ -90,7 +125,14 @@ export class GraphNode extends HTMLElement {
                 }
             })
 
-            shadowRoot.querySelectorAll('.node__title')?.forEach((title) => title.textContent = this.getAttribute('type'))
+            reflectData(this, shadowRoot)
+                setTimeout(() => {
+                    node.classList.remove('node--loading') 
+                    this.getNodeDimension = () => {
+                    const {width, height} = node.getBoundingClientRect()
+                    return {width, height}
+                    }
+                }, 10)
         })
     }
 
@@ -101,9 +143,7 @@ export class GraphNode extends HTMLElement {
     }
 
     get nodeDimensions(){
-        const node = this.shadowRoot?.querySelector(".node") as HTMLElement | null
-        return node ? {width: node.offsetWidth, height: node.offsetHeight} : {width: 0, height: 0}
-
+        return this.getNodeDimension()
     }
 
     get nodeId(){
@@ -111,9 +151,7 @@ export class GraphNode extends HTMLElement {
     }
 
     getInputConnectorCenterPoint(input: string){
-        const element = Array.from(this.children)
-            .flatMap(elem => elem instanceof GraphNodeInput ? [elem as GraphNodeInput] : [])
-            .find(elem => elem.inputName === input)
+        const element = Array.from(this.children).find(elem => elem instanceof GraphNodeInput && elem.inputName === input) as GraphNodeInput | null
         if(!element){
             return {x: NaN, y: NaN}
         }
@@ -126,9 +164,7 @@ export class GraphNode extends HTMLElement {
     }
 
     getInputConnectorEdgePoint(input: string){
-        const element = Array.from(this.children)
-            .flatMap(elem => elem instanceof GraphNodeInput ? [elem as GraphNodeInput] : [])
-            .find(elem => elem.inputName === input)
+        const element = Array.from(this.children).find(elem => elem instanceof GraphNodeInput && elem.inputName === input) as GraphNodeInput | null
         if(!element){
             return {x: NaN, y: NaN}
         }
@@ -141,9 +177,7 @@ export class GraphNode extends HTMLElement {
     }
 
     getOutputConnectorCenterPoint(output: string){
-        const element = Array.from(this.children)
-            .flatMap(elem => elem instanceof GraphNodeOutput ? [elem as GraphNodeOutput] : [])
-            .find(elem => elem.outputName === output)
+        const element = Array.from(this.children).find(elem => elem instanceof GraphNodeOutput && elem.outputName === output) as GraphNodeOutput | null
         if(!element){
             return {x: NaN, y: NaN}
         }
@@ -156,9 +190,7 @@ export class GraphNode extends HTMLElement {
     }
 
     getOutputConnectorEdgePoint(output: string){
-        const element = Array.from(this.children)
-            .flatMap(elem => elem instanceof GraphNodeOutput ? [elem as GraphNodeOutput] : [])
-            .find(elem => elem.outputName === output)
+        const element = Array.from(this.children).find(elem => elem instanceof GraphNodeOutput && elem.outputName === output) as GraphNodeOutput | null
         if(!element){
             return {x: NaN, y: NaN}
         }
