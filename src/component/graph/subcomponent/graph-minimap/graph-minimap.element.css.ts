@@ -34,4 +34,15 @@ export default css`
 .minimap__viewport {
     fill: none;
 }
+
+.minimap__coordinates {
+    display: none;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+.minimap:hover .minimap__coordinates {
+    display: inline-block;
+}
 `

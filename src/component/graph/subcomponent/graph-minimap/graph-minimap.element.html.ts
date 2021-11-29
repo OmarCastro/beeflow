@@ -7,5 +7,6 @@ export default html`
         <g class="minimap__nodes"></g>
         <g class="minimap__viewPort"></g>
     </svg>
+    <div class="minimap__coordinates">0 ;0</div>
 </div>
 `

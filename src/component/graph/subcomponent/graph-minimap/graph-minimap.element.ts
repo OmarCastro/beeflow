@@ -4,6 +4,8 @@ declare type BoundaryTarget<T> = import('../../../../algorithms/boundary.ts').Bo
 import { Boundary } from '../../../../algorithms/boundary.ts'
 import { debounceAnimationFrame } from '../../../../algorithms/debounce.ts'
 
+
+
 let loadTemplate = () => Promise.all([
     import("./graph-minimap.element.css.ts"),
     import("./graph-minimap.element.html.ts")
@@ -42,6 +44,7 @@ const resizeObserver = new ResizeObserver(entries => {
     }
 });
 
+
 export class GraphMinimap extends HTMLElement {
     private removeParentListeners: () => void = () => {};
     private renderMinimap: () => void = () => {};
@@ -55,10 +58,12 @@ export class GraphMinimap extends HTMLElement {
         loadTemplate().then(template => {
             shadowRoot.append(document.importNode(template.content, true))    
 
-            const minimapSvg = shadowRoot.querySelector(".minimap__svg") as SVGElement
+            const minimapSvg = shadowRoot.querySelector(".minimap__svg") as SVGSVGElement
+            const svgPt = minimapSvg.createSVGPoint();  // Created once for document
             const minimapNodes = shadowRoot.querySelector(".minimap__nodes") as SVGGElement
             const minimapEdges = shadowRoot.querySelector(".minimap__edges") as SVGGElement
             const minimapViewPort = shadowRoot.querySelector(".minimap__viewPort") as SVGGElement
+            const minimapCoordinates = shadowRoot.querySelector(".minimap__coordinates") as HTMLElement
             
             const getViewPort = () => {
                 const parentElement = this.parentElement as MaybeGraphElement
@@ -144,8 +149,8 @@ export class GraphMinimap extends HTMLElement {
                 }).join("")
 
                 minimapViewPort.innerHTML = `<rect stroke="red" vector-effect="non-scaling-stroke" stroke-width="1" x="${viewPort.x}" y="${viewPort.y}" width="${viewPort.width}" height="${viewPort.height}" />`
-
             })
+
 
             this.updateNodePosition = (node: GraphNode) => {
                 const {nodeId} = node;
@@ -179,6 +184,58 @@ export class GraphMinimap extends HTMLElement {
 
                 
             }
+
+            
+            minimapSvg.addEventListener("pointermove", (pointerEvent: PointerEvent) => {
+                const { clientX, clientY } = pointerEvent
+                pointerEvent.preventDefault()
+          
+                    // The cursor point, translated into svg coordinates
+                const matrix = minimapSvg.getScreenCTM()
+                if(matrix == null){
+                    return
+                }
+                svgPt.x = clientX
+                svgPt.y = clientY
+                
+                const {x, y} =  svgPt.matrixTransform(matrix.inverse());
+                minimapCoordinates.innerText = `x:${x.toFixed(2)}; y:${y.toFixed(2)}`
+            })
+
+            minimapSvg.addEventListener("click", (pointerEvent: MouseEvent) => {
+                const { clientX, clientY } = pointerEvent
+                pointerEvent.preventDefault()
+          
+                    // The cursor point, translated into svg coordinates
+                const matrix = minimapSvg.getScreenCTM()
+                if(matrix == null){
+                    return
+                }
+                svgPt.x = clientX
+                svgPt.y = clientY
+                
+                const cursorpt =  svgPt.matrixTransform(matrix.inverse());
+                const parent = this.parentElement as MaybeGraphElement
+
+                const rect = parent.viewPortRect
+                if(!rect){
+                    return
+                }
+
+                const clientDx = pointerEvent.clientX - clientX
+                const clientDy = pointerEvent.clientY - clientY
+                parent.setAttribute("x", String(-(cursorpt.x - clientDx - rect.width/2)))
+                parent.setAttribute("y", String(-(cursorpt.y - clientDy - rect.height/2)))
+
+                requestAnimationFrame(() => {
+                    const matrix = minimapSvg.getScreenCTM()
+                    if(matrix == null){
+                        return
+                    }
+                    const {x, y} =  svgPt.matrixTransform(matrix.inverse());
+                    minimapCoordinates.innerText = `x:${x.toFixed(2)}; y:${y.toFixed(2)}`
+                })            
+            })
             
             this.renderMinimap();
         })
