@@ -82,7 +82,8 @@ function updateEdgesOfNode(node: GraphNode, shadowRoot: ShadowRoot, graph: Graph
 export class Graph extends HTMLElement {
 
     private reflecViewPort: () => void = () => {};
-    private positionNodes: () => void = () => {};
+    private positionNodes: () => Promise<void> = () => Promise.resolve();
+    private createEdges: () => void = debounceAnimationFrame(() => this.createEdges());
 
     constructor(){
         super()
@@ -90,18 +91,12 @@ export class Graph extends HTMLElement {
 
         loadTemplate().then(template => {
             shadowRoot.append(document.importNode(template.content, true))
-            const slots = shadowRoot.querySelectorAll('slot');
+            const slot = shadowRoot.querySelector('.graph__nodes slot') as HTMLSlotElement;
             const graph = shadowRoot.querySelector('.graph') as HTMLElement;
             const edges = shadowRoot.querySelector('.graph__edges') as SVGElement;
             const graphStyle = graph.style
-            slots.forEach(slot => {
-                slot.addEventListener('slotchange', (event) => {
-                    console.log(event.target)
-                    console.log(event)
-                    createEdges([...slot.assignedElements()].filter(el => el instanceof GraphEdge).map(el => el as GraphEdge), shadowRoot, this)
-                })
-            })
-
+            slot.addEventListener('slotchange', () => this.createEdges())
+            graph.style.visibility = "hidden"
             graph.addEventListener("wheel", (event) => {
                 const {target, deltaY} = event as WheelEvent
                 if(target === graph){
@@ -186,7 +181,7 @@ export class Graph extends HTMLElement {
 
             const isNodeLoaded = (node: GraphNode) => {
                 const {width, height} = node.nodeDimensions
-                console.log({width, height})
+                console.log({width, height, node})
                 return width > 0 && height > 0
             }
 
@@ -203,7 +198,6 @@ export class Graph extends HTMLElement {
                 return { start: startNode ?? "",  end: endNode ?? ""}
             }
 
-
             const positionNodes = () => {
                 if(!this.isConnected){
                     return
@@ -211,29 +205,42 @@ export class Graph extends HTMLElement {
                 const childNodes = Array.from(this.children)
                 const nodes = childNodes.filter(child => child instanceof GraphNode) as GraphNode[]
                 const edges = childNodes.filter(child => child instanceof GraphEdge) as GraphEdge[]
+                const calculateGraph = calculateLayout({
+                    nodes: nodes.map(toPreCalculatedLayoutNode),
+                    edges: edges.map(toPreCalculatedLayoutEdge),
+                })
+                console.log(calculateGraph)
+                calculateGraph.nodes.forEach(calculatedNode => {
+                    const {name, x, y} = calculatedNode
+                    nodes
+                        .filter(node => node.nodeId === name)
+                        .forEach(node => {
+                            node.setAttribute("x", String(x))
+                            node.setAttribute("y", String(y))
+                        })
+                })
+                this.createEdges = debounceAnimationFrame(() => {
+                    createEdges([...slot.assignedElements()].filter(el => el instanceof GraphEdge).map(el => el as GraphEdge), shadowRoot, this)
+                })
+            }
+
+            const initialPositionNodes = () => {
+                const childNodes = Array.from(this.children)
+                const nodes = childNodes.filter(child => child instanceof GraphNode) as GraphNode[]
+                if(nodes.length <= 0){
+                    return
+                }
                 const areAllNodesLoaded = nodes.every(isNodeLoaded)
                 const areSomeNodePositionsUndefined = nodes.some(isNodePositionUndefined)
                 if(areAllNodesLoaded && areSomeNodePositionsUndefined){
-                    const calculateGraph = calculateLayout({
-                        nodes: nodes.map(toPreCalculatedLayoutNode),
-                        edges: edges.map(toPreCalculatedLayoutEdge),
-                    })
-                    console.log(calculateGraph)
-                    calculateGraph.nodes.forEach(calculatedNode => {
-                        const {name, x, y} = calculatedNode
-                        nodes
-                            .filter(node => node.nodeId === name)
-                            .forEach(node => {
-                                node.setAttribute("x", String(x))
-                                node.setAttribute("y", String(y))
-                            })
-                    })
-                } else if(nodes.length > 0 && areSomeNodePositionsUndefined) {
-                    requestAnimationFrame(positionNodes)
+                    this.positionNodes().then(() => graph.style.removeProperty("visibility"))
+                    return
                 }
+                requestAnimationFrame(initialPositionNodes)
             }
+
             this.positionNodes = debounceAnimationFrame(positionNodes)
-            this.positionNodes()
+            initialPositionNodes()
         })
 
         this.addEventListener("nodePositionChanged", (event) => {
