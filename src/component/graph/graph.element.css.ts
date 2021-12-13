@@ -7,14 +7,20 @@ export default css`
     height: 100%;
 }
 
+:host(.grid) .graph{
+    background-image: radial-gradient(#333 1px, transparent 1px);
+    background-size: calc(100 * var(--scale) * 1px) calc(100 * var(--scale) * 1px);
+    background-position: calc((var(--x) - 50px)) calc((var(--y) - 50px));
+}
+
 .graph {
     width: 100%;
     height: 100%;
     background: #aaa;
     overflow: hidden;
     --scale: 1;
-    --x: 0;
-    --y: 0;
+    --x: 0px;
+    --y: 0px;
 }
 
 .graph__nodes, .graph__edges{
